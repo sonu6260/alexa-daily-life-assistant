@@ -65,57 +65,117 @@ footer{text-align:center;padding:25px;color:#64748b}
 </div>
 </main>
 <footer>Personal productivity prototype</footer>
+
 <script>
 const load = key => {
-  try { return JSON.parse(localStorage.getItem(key)) || []; }
-  catch { return []; }
+  try {
+    const data = JSON.parse(localStorage.getItem(key));
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
 };
+
 let tasks = load("dailyTasks");
 let shopping = load("shoppingItems");
+let completed = load("completedTasks");
 
 function save(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
 }
-function render(list, element, key) {
+
+function render(list, element, key, isTask = false) {
   element.replaceChildren();
+
   list.forEach((item, index) => {
     const li = document.createElement("li");
     const text = document.createElement("span");
     text.textContent = item;
+
+    if (isTask && completed.includes(item)) {
+      text.style.textDecoration = "line-through";
+      text.style.color = "#64748b";
+    }
+
+    li.append(text);
+
+    if (isTask) {
+      const done = document.createElement("button");
+      done.textContent = completed.includes(item)
+        ? "Undo"
+        : "Complete";
+      done.style.background = "#16a34a";
+      done.type = "button";
+
+      done.onclick = () => {
+        if (completed.includes(item)) {
+          completed = completed.filter(t => t !== item);
+        } else {
+          completed.push(item);
+        }
+        save("completedTasks", completed);
+        refresh();
+      };
+
+      li.append(done);
+    }
+
     const remove = document.createElement("button");
     remove.textContent = "Delete";
     remove.type = "button";
+
     remove.onclick = () => {
       list.splice(index, 1);
+      if (isTask) {
+        completed = completed.filter(t => t !== item);
+        save("completedTasks", completed);
+      }
       save(key, list);
-      render(list, element, key);
+      refresh();
     };
-    li.append(text, remove);
+
+    li.append(remove);
     element.append(li);
   });
 }
+
 function refresh() {
-  render(tasks, document.getElementById("tasks"), "dailyTasks");
-  render(shopping, document.getElementById("shopping"), "shoppingItems");
+  render(tasks, document.getElementById("tasks"),
+    "dailyTasks", true);
+  render(shopping, document.getElementById("shopping"),
+    "shoppingItems");
 }
+
+function addTask(value) {
+  const task = value.trim();
+  if (!task) return false;
+  tasks.push(task);
+  save("dailyTasks", tasks);
+  refresh();
+  return true;
+}
+
+function addShopping(value) {
+  const item = value.trim();
+  if (!item) return false;
+  shopping.push(item);
+  save("shoppingItems", shopping);
+  refresh();
+  return true;
+}
+
 document.getElementById("taskForm").onsubmit = e => {
   e.preventDefault();
   const input = document.getElementById("taskInput");
-  tasks.push(input.value.trim());
-  tasks = tasks.filter(Boolean);
-  save("dailyTasks", tasks);
-  input.value = "";
-  refresh();
+  if (addTask(input.value)) input.value = "";
 };
+
 document.getElementById("shopForm").onsubmit = e => {
   e.preventDefault();
   const input = document.getElementById("shopInput");
-  const value = input.value.trim();
-  if (value) shopping.push(value);
-  save("shoppingItems", shopping);
-  input.value = "";
-  refresh();
+  if (addShopping(input.value)) input.value = "";
 };
+
 function reply(message) {
   const chat = document.getElementById("chat");
   const row = document.createElement("div");
@@ -124,37 +184,92 @@ function reply(message) {
   chat.append(row);
   chat.scrollTop = chat.scrollHeight;
 }
+
+function handleMessage(message) {
+  const text = message.trim();
+  const lower = text.toLowerCase();
+
+  if (lower.startsWith("add task ")) {
+    const task = text.slice(9).trim();
+    return addTask(task)
+      ? `Task added: ${task}`
+      : "Please enter a task name.";
+  }
+
+  if (lower.startsWith("add shopping ")) {
+    const item = text.slice(13).trim();
+    return addShopping(item)
+      ? `Shopping item added: ${item}`
+      : "Please enter a shopping item.";
+  }
+
+  if (
+    lower.startsWith("complete task ") ||
+    lower.startsWith("finish task ")
+  ) {
+    const taskName = text.slice(
+      lower.startsWith("complete task ") ? 14 : 12
+    ).trim().toLowerCase();
+
+    const task = tasks.find(t => t.toLowerCase() === taskName);
+
+    if (!task) return "I couldn't find that task.";
+
+    if (!completed.includes(task)) completed.push(task);
+    save("completedTasks", completed);
+    refresh();
+    return `Task completed: ${task}`;
+  }
+
+  if (
+    lower.includes("shopping list") ||
+    lower.includes("grocery") ||
+    lower === "show shopping"
+  ) {
+    return shopping.length
+      ? "Your shopping list: " + shopping.join(", ")
+      : "Your shopping list is empty.";
+  }
+
+  if (
+    lower.includes("my tasks") ||
+    lower.includes("plan my day") ||
+    lower === "plan my day" ||
+    lower === "show tasks" ||
+    lower === "show my tasks" ||
+    lower.includes("daily plan")
+  ) {
+    if (!tasks.length) return "No tasks yet. Add your first task!";
+
+    const pending = tasks.filter(t => !completed.includes(t));
+    const done = tasks.filter(t => completed.includes(t));
+
+    return `Your day: ${pending.length} pending, ${done.length} completed. ` +
+      (pending.length ? "To do: " + pending.join(", ") : "All tasks completed!");
+  }
+
+  if (lower === "help" || lower.includes("what can you do")) {
+    return "Try: Add task study PHP, Complete task study PHP, " +
+      "Show my tasks, Add shopping milk, or Show my shopping list.";
+  }
+
+  return "I can manage tasks and shopping lists. Type Help to see commands.";
+}
+
 document.getElementById("chatForm").onsubmit = e => {
   e.preventDefault();
   const input = document.getElementById("chatInput");
   const message = input.value.trim();
+
   if (!message) return;
+
   reply("You: " + message);
-  const lower = message.toLowerCase();
-  let answer;
-  if (lower.includes("plan") || lower.includes("day")) {
-    answer = tasks.length
-      ? "Your tasks: " + tasks.join(", ")
-      : "Your task list is empty. Add your first task in Daily Tasks.";
-  } else if (lower.includes("shopping") || lower.includes("grocery")) {
-    answer = shopping.length
-      ? "Shopping list: " + shopping.join(", ")
-      : "Your shopping list is empty. Add an item first.";
-  } else if (lower.startsWith("add task ")) {
-    const task = message.slice(9).trim();
-    if (task) {
-      tasks.push(task);
-      save("dailyTasks", tasks);
-      refresh();
-      answer = "Task added: " + task;
-    } else answer = "Please provide a task name.";
-  } else {
-    answer = "I can show your day plan or shopping list. Try 'Plan my day' or 'Show my shopping list'.";
-  }
-  reply("Assistant: " + answer);
+  reply("Assistant: " + handleMessage(message));
   input.value = "";
 };
+
 refresh();
 </script>
+
 </body>
 </html>
