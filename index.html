@@ -185,6 +185,7 @@ function reply(message) {
   chat.scrollTop = chat.scrollHeight;
 }
 
+
 function handleMessage(message) {
   const text = message.trim();
   const lower = text.toLowerCase();
@@ -203,57 +204,42 @@ function handleMessage(message) {
       : "Please enter a shopping item.";
   }
 
-  if (
-    lower.startsWith("complete task ") ||
-    lower.startsWith("finish task ")
-  ) {
-    const taskName = text.slice(
-      lower.startsWith("complete task ") ? 14 : 12
-    ).trim().toLowerCase();
+  if (lower.startsWith("complete task ")) {
+    const name = text.slice(14).trim().toLowerCase();
+    const task = tasks.find(t => t.toLowerCase() === name);
 
-    const task = tasks.find(t => t.toLowerCase() === taskName);
-
-    if (!task) return "I couldn't find that task.";
+    if (!task) return "Task not found. Check the task name.";
 
     if (!completed.includes(task)) completed.push(task);
     save("completedTasks", completed);
     refresh();
-    return `Task completed: ${task}`;
+    return `Completed: ${task}`;
   }
 
-  if (
-    lower.includes("shopping list") ||
-    lower.includes("grocery") ||
-    lower === "show shopping"
-  ) {
-    return shopping.length
-      ? "Your shopping list: " + shopping.join(", ")
-      : "Your shopping list is empty.";
-  }
-
-  if (
-    lower.includes("my tasks") ||
-    lower.includes("plan my day") ||
-    lower === "plan my day" ||
-    lower === "show tasks" ||
-    lower === "show my tasks" ||
-    lower.includes("daily plan")
-  ) {
-    if (!tasks.length) return "No tasks yet. Add your first task!";
-
+  if (lower === "show my tasks" || lower === "show tasks" ||
+      lower === "plan my day") {
     const pending = tasks.filter(t => !completed.includes(t));
     const done = tasks.filter(t => completed.includes(t));
 
-    return `Your day: ${pending.length} pending, ${done.length} completed. ` +
-      (pending.length ? "To do: " + pending.join(", ") : "All tasks completed!");
+    return `Pending: ${pending.length}. Completed: ${done.length}. ` +
+      (pending.length ? "To do: " + pending.join(", ") :
+      "All tasks completed!");
   }
 
-  if (lower === "help" || lower.includes("what can you do")) {
-    return "Try: Add task study PHP, Complete task study PHP, " +
-      "Show my tasks, Add shopping milk, or Show my shopping list.";
+  if (lower.includes("shopping list") ||
+      lower.includes("grocery")) {
+    return shopping.length
+      ? "Shopping list: " + shopping.join(", ")
+      : "Your shopping list is empty.";
   }
 
-  return "I can manage tasks and shopping lists. Type Help to see commands.";
+  if (lower === "help") {
+    return "Commands: Add task study PHP | Show my tasks | " +
+      "Complete task study PHP | Add shopping milk | " +
+      "Show my shopping list";
+  }
+
+  return "I didn't understand. Type Help to see available commands.";
 }
 
 document.getElementById("chatForm").onsubmit = e => {
