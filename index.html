@@ -1,0 +1,160 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alexa+ Daily Life Assistant</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f6fc;color:#182337}
+header{background:#172554;color:white;padding:22px;text-align:center}
+header p{color:#c7d2fe}
+main{max-width:950px;margin:25px auto;padding:0 16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}
+.card{background:white;padding:20px;border-radius:16px;box-shadow:0 4px 18px #15254a12}
+h2{font-size:19px}
+input,button{padding:12px;border-radius:8px;font-size:15px}
+input{width:100%;border:1px solid #cbd5e1;margin:6px 0}
+button{border:0;background:#2563eb;color:white;cursor:pointer}
+button:hover{background:#1d4ed8}
+form{display:flex;gap:6px}
+form input{min-width:0}
+form button{white-space:nowrap}
+ul{padding-left:20px}
+li{padding:7px 0;overflow-wrap:anywhere}
+li button{padding:5px 9px;margin-left:6px;background:#dc2626}
+#chat{height:210px;overflow:auto;background:#f8fafc;padding:12px;border-radius:8px}
+.msg{padding:8px;margin:6px 0;border-radius:8px;background:#e0e7ff}
+footer{text-align:center;padding:25px;color:#64748b}
+</style>
+</head>
+<body>
+<header>
+  <h1>✨ Alexa+ Daily Life Assistant</h1>
+  <p>Your daily planner, shopping list and personal helper</p>
+</header>
+<main>
+<div class="cards">
+<section class="card">
+<h2>📅 Daily Tasks</h2>
+<form id="taskForm">
+<input id="taskInput" placeholder="Enter a task..." required>
+<button>Add</button>
+</form>
+<ul id="tasks"></ul>
+</section>
+<section class="card">
+<h2>🛒 Shopping List</h2>
+<form id="shopForm">
+<input id="shopInput" placeholder="Add shopping item..." required>
+<button>Add</button>
+</form>
+<ul id="shopping"></ul>
+</section>
+<section class="card">
+<h2>💬 Assistant</h2>
+<div id="chat" aria-live="polite">
+<div class="msg">Hello! Ask me to plan your day or add a task.</div>
+</div>
+<form id="chatForm">
+<input id="chatInput" placeholder="Type a message..." required>
+<button>Send</button>
+</form>
+</section>
+</div>
+</main>
+<footer>Personal productivity prototype</footer>
+<script>
+const load = key => {
+  try { return JSON.parse(localStorage.getItem(key)) || []; }
+  catch { return []; }
+};
+let tasks = load("dailyTasks");
+let shopping = load("shoppingItems");
+
+function save(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+}
+function render(list, element, key) {
+  element.replaceChildren();
+  list.forEach((item, index) => {
+    const li = document.createElement("li");
+    const text = document.createElement("span");
+    text.textContent = item;
+    const remove = document.createElement("button");
+    remove.textContent = "Delete";
+    remove.type = "button";
+    remove.onclick = () => {
+      list.splice(index, 1);
+      save(key, list);
+      render(list, element, key);
+    };
+    li.append(text, remove);
+    element.append(li);
+  });
+}
+function refresh() {
+  render(tasks, document.getElementById("tasks"), "dailyTasks");
+  render(shopping, document.getElementById("shopping"), "shoppingItems");
+}
+document.getElementById("taskForm").onsubmit = e => {
+  e.preventDefault();
+  const input = document.getElementById("taskInput");
+  tasks.push(input.value.trim());
+  tasks = tasks.filter(Boolean);
+  save("dailyTasks", tasks);
+  input.value = "";
+  refresh();
+};
+document.getElementById("shopForm").onsubmit = e => {
+  e.preventDefault();
+  const input = document.getElementById("shopInput");
+  const value = input.value.trim();
+  if (value) shopping.push(value);
+  save("shoppingItems", shopping);
+  input.value = "";
+  refresh();
+};
+function reply(message) {
+  const chat = document.getElementById("chat");
+  const row = document.createElement("div");
+  row.className = "msg";
+  row.textContent = message;
+  chat.append(row);
+  chat.scrollTop = chat.scrollHeight;
+}
+document.getElementById("chatForm").onsubmit = e => {
+  e.preventDefault();
+  const input = document.getElementById("chatInput");
+  const message = input.value.trim();
+  if (!message) return;
+  reply("You: " + message);
+  const lower = message.toLowerCase();
+  let answer;
+  if (lower.includes("plan") || lower.includes("day")) {
+    answer = tasks.length
+      ? "Your tasks: " + tasks.join(", ")
+      : "Your task list is empty. Add your first task in Daily Tasks.";
+  } else if (lower.includes("shopping") || lower.includes("grocery")) {
+    answer = shopping.length
+      ? "Shopping list: " + shopping.join(", ")
+      : "Your shopping list is empty. Add an item first.";
+  } else if (lower.startsWith("add task ")) {
+    const task = message.slice(9).trim();
+    if (task) {
+      tasks.push(task);
+      save("dailyTasks", tasks);
+      refresh();
+      answer = "Task added: " + task;
+    } else answer = "Please provide a task name.";
+  } else {
+    answer = "I can show your day plan or shopping list. Try 'Plan my day' or 'Show my shopping list'.";
+  }
+  reply("Assistant: " + answer);
+  input.value = "";
+};
+refresh();
+</script>
+</body>
+</html>
